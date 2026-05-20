@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @mazerush/shared build && pnpm --filter @mazerush/client build",
+  "outputDirectory": "apps/client/dist",
+  "framework": null
+}

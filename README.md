@@ -54,15 +54,21 @@ Per-workspace scripts (run with `pnpm --filter <pkg> <script>`):
 
 The maze generator runs on both sides: the server generates authoritatively, the client regenerates from the seed it receives. Sharing message types and constants in a pure-TS package eliminates client/server desync.
 
-## Roadmap (one PR per step)
+## Deployment
 
-1. Monorepo skeleton — pnpm workspaces, tsconfig base, ESLint/Prettier, root scripts. ✅
-2. `shared` package — types, constants, seeded RNG, recursive backtracker + Vitest determinism tests.
-3. Standalone client — Three.js scene, `InstancedMesh` walls, PointerLock FPS controls, local AABB collision.
-4. Minimal Colyseus server — `MazeRoom` that generates a seed, accepts connections, tracks players.
-5. Wire client ↔ server — input messages up, state down, naive remote rendering (no prediction yet).
-6. Client prediction + reconciliation for local player; remote interpolation buffer.
-7. Server-side validation — speed cap, AABB vs maze, snap-back on cheat.
-8. Game modes — flag pickup, exits, win conditions.
-9. Lobby + HUD + EndScreen.
-10. Dockerfile + deploy guide (Fly.io target).
+See [DEPLOY.md](DEPLOY.md). MVP setup is **client on Vercel** (free
+forever) and **server on your own machine + Cloudflare Tunnel** (also
+free). Total cost while your machine is on: $0/month.
+
+## Roadmap
+
+1. ✅ Monorepo skeleton — pnpm workspaces, tsconfig base, ESLint/Prettier, root scripts.
+2. ✅ `shared` package — types, constants, seeded RNG, recursive backtracker + Vitest determinism tests.
+3. ✅ Standalone client — Three.js scene, `InstancedMesh` walls, PointerLock FPS controls, local AABB collision.
+4. ✅ Minimal Colyseus server — `MazeRoom` that generates a seed, accepts connections, tracks players.
+5. ✅ Wire client ↔ server — input messages up, state down, naive remote rendering.
+6. ✅ Client prediction + reconciliation for local player; remote interpolation buffer.
+7. ✅ Server-side validation — speed cap, AABB vs maze, snap-back on cheat.
+8. ✅ Game modes — flag pickup, exits, win conditions.
+9. ✅ Lobby + HUD + EndScreen.
+10. ✅ Deploy guide — Vercel client + Cloudflare Tunnel server, Origin check, env config.

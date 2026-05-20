@@ -1,0 +1,15 @@
+node_modules
+dist
+coverage
+.vite
+.DS_Store
+*.log
+.env
+.env.local
+.env.*.local
+
+# Local Claude Code config — user-specific, not for the team.
+.claude/
+
+# tsc --build incremental cache
+*.tsbuildinfo

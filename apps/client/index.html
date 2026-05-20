@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MazeRush</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #0a0a0c;
+        color: #eee;
+        font-family: system-ui, sans-serif;
+        overflow: hidden;
+      }
+      #app {
+        position: absolute;
+        inset: 0;
+      }
+      #app canvas {
+        display: block;
+      }
+      #crosshair {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 4px;
+        height: 4px;
+        margin: -2px 0 0 -2px;
+        background: #fff;
+        border-radius: 50%;
+        pointer-events: none;
+        opacity: 0.7;
+        mix-blend-mode: difference;
+        z-index: 4;
+      }
+      #hud {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 5;
+      }
+      #hud .hud-top {
+        position: absolute;
+        top: 0.75rem;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      #hud .hud-status {
+        padding: 0.5rem 1rem;
+        background: rgba(10, 10, 12, 0.6);
+        border: 1px solid rgba(120, 120, 140, 0.25);
+        border-radius: 8px;
+        font-size: 0.95rem;
+      }
+      #hud .hud-room {
+        font-family: ui-monospace, monospace;
+        font-size: 0.78rem;
+        opacity: 0.6;
+        letter-spacing: 0.08em;
+      }
+      #hud .hud-players {
+        position: absolute;
+        top: 0.75rem;
+        left: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        background: rgba(10, 10, 12, 0.6);
+        border: 1px solid rgba(120, 120, 140, 0.25);
+        border-radius: 8px;
+        max-width: 14rem;
+      }
+      #hud .hud-players ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        font-size: 0.85rem;
+      }
+      #hud .hud-players li {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.1rem 0;
+      }
+      #hud .hud-players .dot {
+        display: inline-block;
+        width: 0.6rem;
+        height: 0.6rem;
+        border-radius: 50%;
+      }
+      #hud #hud-minimap {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        background: rgba(10, 10, 12, 0.6);
+        border: 1px solid rgba(120, 120, 140, 0.25);
+        border-radius: 8px;
+      }
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(8, 8, 12, 0.85);
+        backdrop-filter: blur(4px);
+        z-index: 10;
+      }
+      .overlay .panel {
+        min-width: 22rem;
+        padding: 2rem 2.5rem;
+        text-align: center;
+        border: 1px solid #2a2a32;
+        border-radius: 10px;
+        background: #11131a;
+      }
+      .overlay h1 {
+        margin: 0 0 0.25rem 0;
+        font-size: 1.6rem;
+        letter-spacing: 0.04em;
+      }
+      .overlay p {
+        margin: 0.5rem 0;
+        opacity: 0.7;
+        font-size: 0.95rem;
+      }
+      .overlay button {
+        padding: 0.6rem 1.25rem;
+        font: inherit;
+        font-size: 0.95rem;
+        background: #4f7cff;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .overlay button:hover:not(:disabled) {
+        background: #6a8fff;
+      }
+      .overlay button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      kbd {
+        background: #1e2030;
+        border: 1px solid #2a2a32;
+        border-radius: 4px;
+        padding: 1px 6px;
+        font-family: ui-monospace, monospace;
+        font-size: 0.85em;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="crosshair"></div>
+    <div id="hud"></div>
+
+    <div id="lobby" class="overlay"></div>
+
+    <div id="prelock" class="overlay">
+      <div class="panel">
+        <h1>MazeRush</h1>
+        <p>
+          Move with <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>, look with the mouse,
+          sprint with <kbd>Shift</kbd>.
+        </p>
+        <p>Press <kbd>Esc</kbd> to release the cursor.</p>
+        <button id="play">Click to play</button>
+        <p id="status" style="margin-top: 1rem; font-size: 0.85rem; opacity: 0.6;"></p>
+      </div>
+    </div>
+
+    <div id="endscreen" class="overlay"></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -118,6 +118,15 @@ async function boot(): Promise<void> {
   });
   playBtn.addEventListener('click', () => controls.requestLock());
 
+  // Tag-to-drop: left-click sends a 'tag' message. Server checks distance
+  // + facing cone + cooldown; if it accepts, the flag becomes uncarried
+  // and falls at the carrier's last position (state.flag updates flow back
+  // via the same syncRoomState callbacks we already have).
+  controls.onAction(() => {
+    if (state.phase !== PHASE_PLAYING) return;
+    room.send('tag', {});
+  });
+
   // 7. End screen — shown once when the server transitions to PHASE_ENDED.
   const endScreen = new EndScreen(endscreenEl);
   let endShown = false;

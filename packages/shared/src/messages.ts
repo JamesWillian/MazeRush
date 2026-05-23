@@ -15,14 +15,17 @@ export type InputMessage = {
   readonly deltaMs: number;
 };
 
-// Action messages are rare events (pickup, reach exit). Listed here for
-// completeness — wired up in Step 8.
-export type ActionMessage =
-  | { readonly type: 'pickupFlag' }
-  | { readonly type: 'reachExit' };
-
+// Wire-level message names. Pickup and exit are server-detected on tick
+// (see GameRules), so the client doesn't have to claim those — that closes
+// the "client lies about being close" vector. `tag` is the one explicit
+// action: the player has to actually press something, so the click goes
+// up here and the server validates geometry.
 export const MessageType = {
   Input: 'input',
-  Action: 'action',
+  Tag: 'tag',
 } as const;
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
+
+// Tag carries no payload — server already knows who sent it (sessionId)
+// and decides everything else from authoritative state.
+export type TagMessage = Record<string, never>;

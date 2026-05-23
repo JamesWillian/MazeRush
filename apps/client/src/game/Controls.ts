@@ -21,12 +21,16 @@ export class Controls {
   private yaw = Math.PI; // face +Z by default (away from NW corner spawn)
   private pitch = 0;
   private readonly listeners: Array<(locked: boolean) => void> = [];
+  private readonly actionListeners: Array<() => void> = [];
 
   constructor(private readonly target: HTMLElement) {
     document.addEventListener('pointerlockchange', this.onPointerLockChange);
     document.addEventListener('mousemove', this.onMouseMove);
     document.addEventListener('keydown', this.onKeyDown);
     document.addEventListener('keyup', this.onKeyUp);
+    // Action button (left mouse). Attached to the target rather than
+    // document so it doesn't fight with overlay buttons living elsewhere.
+    this.target.addEventListener('mousedown', this.onMouseDown);
   }
 
   requestLock(): void {
@@ -41,6 +45,13 @@ export class Controls {
 
   onLockChange(cb: (locked: boolean) => void): void {
     this.listeners.push(cb);
+  }
+
+  // Fires on left-mouse-down while the pointer is locked. Used by main.ts
+  // to send a 'tag' message — generic enough that future actions (drop
+  // flag, taunt, etc.) can register here.
+  onAction(cb: () => void): void {
+    this.actionListeners.push(cb);
   }
 
   get isLocked(): boolean {
@@ -84,10 +95,17 @@ export class Controls {
     this.keys.delete(e.code);
   };
 
+  private readonly onMouseDown = (e: MouseEvent): void => {
+    if (!this.locked) return;
+    if (e.button !== 0) return;
+    for (const cb of this.actionListeners) cb();
+  };
+
   dispose(): void {
     document.removeEventListener('pointerlockchange', this.onPointerLockChange);
     document.removeEventListener('mousemove', this.onMouseMove);
     document.removeEventListener('keydown', this.onKeyDown);
     document.removeEventListener('keyup', this.onKeyUp);
+    this.target.removeEventListener('mousedown', this.onMouseDown);
   }
 }

@@ -23,6 +23,9 @@ import {
   PHASE_PLAYING,
   pickFloorCells,
   stepPlayer,
+  TAG_COOLDOWN_MS,
+  TAG_FRONT_CONE_COS,
+  TAG_REACH_RADIUS,
   TICK_INTERVAL_MS,
   type MazeGrid,
 } from '@mazerush/shared';
@@ -52,6 +55,9 @@ export class MazeRoom extends Room<GameState> {
   override maxClients = MAX_PLAYERS_PER_ROOM;
   private maze: MazeGrid | null = null;
   private readonly validators = new Map<string, MovementValidator>();
+  // Tag cooldown per attacker: server time of the last 'tag' message we
+  // accepted. Prevents click-spam from drowning the carrier.
+  private readonly lastTagAtMs = new Map<string, number>();
   // Pre-picked spawn cells (deterministic via the maze seed). Popped on
   // join so each player gets a distinct starting cell. Late joiners after
   // pool exhaustion fall back to (1,1).
@@ -105,6 +111,7 @@ export class MazeRoom extends Room<GameState> {
     this.setPatchRate(TICK_INTERVAL_MS);
     this.setSimulationInterval(() => this.tick(), TICK_INTERVAL_MS);
     this.onMessage('input', (client, raw: unknown) => this.handleInput(client, raw));
+    this.onMessage('tag', (client) => this.handleTag(client));
 
     logger.info(
       {
@@ -156,6 +163,7 @@ export class MazeRoom extends Room<GameState> {
 
     this.state.players.delete(client.sessionId);
     this.validators.delete(client.sessionId);
+    this.lastTagAtMs.delete(client.sessionId);
     logger.info({ roomId: this.roomId, sessionId: client.sessionId }, 'player left');
   }
 
@@ -244,6 +252,55 @@ export class MazeRoom extends Room<GameState> {
         );
       }
     }
+  }
+
+  // Tag-to-drop: if the attacker is close to AND facing the flag carrier,
+  // knock the flag off them. All checks server-side; client message is
+  // payload-less ('I clicked'). The cooldown timestamp is recorded on
+  // EVERY attempt, even rejections, so click-spamming costs the cheater
+  // their successful tries too.
+  private handleTag(client: Client): void {
+    if (this.state.phase !== PHASE_PLAYING) return;
+
+    const attacker = this.state.players.get(client.sessionId);
+    if (!attacker) return;
+
+    const now = Date.now();
+    const last = this.lastTagAtMs.get(client.sessionId) ?? 0;
+    if (now - last < TAG_COOLDOWN_MS) return;
+    this.lastTagAtMs.set(client.sessionId, now);
+
+    const carrierId = this.state.flag.carriedBy;
+    if (carrierId === '' || carrierId === client.sessionId) return;
+
+    const carrier = this.state.players.get(carrierId);
+    if (!carrier) return;
+
+    const dx = carrier.x - attacker.x;
+    const dz = carrier.z - attacker.z;
+    const dist2 = dx * dx + dz * dz;
+    if (dist2 > TAG_REACH_RADIUS * TAG_REACH_RADIUS) return;
+
+    // Facing-cone check. Skip if effectively overlapping (dist ~ 0) — the
+    // direction is undefined and any orientation should count as "on
+    // top of them".
+    const dist = Math.sqrt(dist2);
+    if (dist > 1e-3) {
+      const forwardX = -Math.sin(attacker.yaw);
+      const forwardZ = -Math.cos(attacker.yaw);
+      const toX = dx / dist;
+      const toZ = dz / dist;
+      const dot = forwardX * toX + forwardZ * toZ;
+      if (dot < TAG_FRONT_CONE_COS) return;
+    }
+
+    this.state.flag.carriedBy = '';
+    this.state.flag.x = carrier.x;
+    this.state.flag.z = carrier.z;
+    logger.info(
+      { roomId: this.roomId, attacker: client.sessionId, carrier: carrierId },
+      'flag tagged off carrier',
+    );
   }
 
   private handleInput(client: Client, raw: unknown): void {

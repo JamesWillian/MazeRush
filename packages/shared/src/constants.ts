@@ -30,6 +30,15 @@ export const MIN_PLAYERS_PER_ROOM = 2;
 export const FLAG_PICKUP_RADIUS = 1.0;
 export const EXIT_REACH_RADIUS = 1.2;
 
+// Tag-to-drop mechanic: a player can knock the flag off the carrier by
+// left-clicking when close to and facing them. Server-authoritative —
+// client just sends a 'tag' message, server checks geometry + cooldown.
+export const TAG_REACH_RADIUS = 1.2;
+// cos(60°) — carrier must be within a 120° forward cone of the attacker.
+// 0.5 = 60° half-angle; lower (looser) makes drive-by tagging easier.
+export const TAG_FRONT_CONE_COS = 0.5;
+export const TAG_COOLDOWN_MS = 500;
+
 export const INTERPOLATION_DELAY_MS = 100;
 
 // Game flow timings.

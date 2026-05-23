@@ -34,8 +34,17 @@ export class Controls {
   }
 
   requestLock(): void {
-    if (!this.locked) {
-      this.target.requestPointerLock();
+    if (this.locked) return;
+    // Chrome 113+ returns a Promise that can reject (e.g. when the user's
+    // ESC-to-unlock happened less than ~1.5s ago, or when the page isn't
+    // focused). Swallowing it silently leaves the player stuck on the
+    // overlay with no clue why — surface it to the console so they (and
+    // we) can see what went wrong.
+    const result = this.target.requestPointerLock() as void | Promise<void>;
+    if (result instanceof Promise) {
+      result.catch((err: unknown) => {
+        console.warn('[mazerush] pointer lock request rejected:', err);
+      });
     }
   }
 

@@ -28,7 +28,11 @@ export const MAX_PLAYERS_PER_ROOM = 8;
 export const MIN_PLAYERS_PER_ROOM = 2;
 
 export const FLAG_PICKUP_RADIUS = 1.0;
-export const EXIT_REACH_RADIUS = 1.2;
+// Player wins when their center is within this distance of the door cell
+// center. 1.5u is calibrated so the player has to actually press up
+// against the perimeter wall (~1.3u away at the wall contact) — no
+// "drive-by" wins from the middle of the adjacent inner cell.
+export const EXIT_REACH_RADIUS = 1.5;
 
 // Tag-to-drop mechanic: a player can knock the flag off the carrier by
 // left-clicking when close to and facing them. Server-authoritative —

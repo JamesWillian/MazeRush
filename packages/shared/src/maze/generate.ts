@@ -3,10 +3,11 @@ import { Tile, type MazeGrid } from './types.js';
 
 // Fraction of "loopable" interior walls to knock down AFTER the recursive
 // backtracker finishes. A perfect maze has exactly one path between any
-// two cells, which means long winding corridors; opening ~15% of walls
+// two cells, which means long winding corridors; opening ~25% of walls
 // between adjacent floor cells creates loops, dead-end shortcuts, and
-// way more intersections without sacrificing connectivity.
-const LOOP_OPEN_FRACTION = 0.15;
+// way more intersections without sacrificing connectivity. (Bumped from
+// 0.15 — 0.15 still left noticeable corridors.)
+const LOOP_OPEN_FRACTION = 0.25;
 
 export type GenerateOptions = {
   readonly width: number;

@@ -155,12 +155,12 @@ export class HUD {
       }
     }
 
-    // Exits
+    // Exits — paint the perimeter wall cell green to match the in-game
+    // door block. A full square (not a circle) makes it read as "the
+    // wall is the exit", which lines up with the touch-to-win mechanic.
     ctx.fillStyle = '#4ade80';
     state.exits.forEach((e) => {
-      ctx.beginPath();
-      ctx.arc((e.gx + 0.5) * cellPx, (e.gy + 0.5) * cellPx, cellPx * 0.6, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillRect(e.gx * cellPx, e.gy * cellPx, cellPx, cellPx);
     });
 
     // Flag (only show on ground; while carried, it's already implied by the carrier's color + 🚩 in the list)
@@ -175,17 +175,31 @@ export class HUD {
     // Remote players — arrows pointing the way they're facing, same
     // shape as self so everyone reads the minimap the same way.
     u.remotes.forEach(({ x, z, yaw, name, color }) => {
-      this.drawPlayerArrow(x, z, yaw, color || colorForName(name));
+      this.drawPlayerArrow(x, z, yaw, color || colorForName(name), false);
     });
 
-    // Self — drawn last so it sits on top of any remote standing on us.
+    // Self — drawn last so it sits on top of any remote standing on us,
+    // and gets the white outline so the local player can spot themselves
+    // at a glance.
     const me = state.players.get(u.mySessionId);
     if (me) {
-      this.drawPlayerArrow(u.selfPos.x, u.selfPos.z, u.selfYaw, me.color || colorForName(me.name));
+      this.drawPlayerArrow(
+        u.selfPos.x,
+        u.selfPos.z,
+        u.selfYaw,
+        me.color || colorForName(me.name),
+        true,
+      );
     }
   }
 
-  private drawPlayerArrow(x: number, z: number, yaw: number, color: string): void {
+  private drawPlayerArrow(
+    x: number,
+    z: number,
+    yaw: number,
+    color: string,
+    isSelf: boolean,
+  ): void {
     const { px, py } = this.worldToPx(x, z);
     const size = this.cellPx * 0.85;
     // Forward direction in screen px: yaw=0 looks -Z (up on minimap with +Z = down).
@@ -199,8 +213,12 @@ export class HUD {
     const rightY = py + (-fx - fz * 0.4) * (size * 0.5);
 
     this.ctx.fillStyle = color;
-    this.ctx.strokeStyle = '#0a0a0c';
-    this.ctx.lineWidth = 1;
+    // Self gets a thin white halo so the local player can find themselves
+    // at a glance without having to remember their own color. Everyone
+    // else gets the default dark outline — keeps the minimap readable on
+    // light tiles without highlighting other players to you.
+    this.ctx.strokeStyle = isSelf ? '#ffffff' : '#0a0a0c';
+    this.ctx.lineWidth = isSelf ? 1.6 : 1;
     this.ctx.beginPath();
     this.ctx.moveTo(tipX, tipY);
     this.ctx.lineTo(leftX, leftY);

@@ -28,11 +28,11 @@ export interface FlagStateView {
   carriedBy: string;
 }
 
+// `gx, gy` = the perimeter wall cell rendered as a green door block.
+// Reaching it (within EXIT_REACH_RADIUS of its center) wins the round.
 export interface ExitPointView {
   gx: number;
   gy: number;
-  doorX: number;
-  doorY: number;
 }
 
 export interface ArraySchemaLike<T> {

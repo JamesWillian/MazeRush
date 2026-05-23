@@ -154,3 +154,39 @@ export function exitsToReadonly(exits: ArrayLike<ExitPoint>): CellPos[] {
   }
   return out;
 }
+
+// Picks `count` spawn cells on the inner perimeter (one cell in from the
+// outer wall — guaranteed Floor since cells live at odd coords). Sorted
+// by descending grid-distance from the flag so the first players to join
+// get the spots furthest from the center, making the early game a real
+// race instead of a 3-step grab.
+export function pickPerimeterSpawns(
+  maze: MazeGrid,
+  flag: CellPos,
+  count: number,
+): Array<readonly [number, number]> {
+  const seen = new Set<string>();
+  const candidates: Array<{ x: number; y: number; distSq: number }> = [];
+  const push = (x: number, y: number): void => {
+    const key = `${x},${y}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const dx = x - flag.gx;
+    const dy = y - flag.gy;
+    candidates.push({ x, y, distSq: dx * dx + dy * dy });
+  };
+
+  for (let x = 1; x < maze.width - 1; x += 2) {
+    push(x, 1);
+    push(x, maze.height - 2);
+  }
+  for (let y = 1; y < maze.height - 1; y += 2) {
+    push(1, y);
+    push(maze.width - 2, y);
+  }
+
+  candidates.sort((a, b) => b.distSq - a.distSq);
+  return candidates.slice(0, Math.min(count, candidates.length)).map(
+    (c) => [c.x, c.y] as const,
+  );
+}

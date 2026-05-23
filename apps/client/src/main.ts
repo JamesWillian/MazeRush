@@ -26,6 +26,7 @@ import type { GameStateView } from './net/stateTypes.js';
 import {
   loadPlayerColor,
   loadWallColor,
+  randomPlayerColor,
   savePlayerColor,
   saveWallColor,
 } from './ui/colorStore.js';
@@ -56,10 +57,16 @@ async function boot(): Promise<void> {
     throw new Error('client boot: required DOM nodes missing');
   }
 
-  // Restore saved colors BEFORE the lobby so the avatar color used at join
-  // matches what the player picked last session.
+  // Restore saved colors BEFORE the lobby so the avatar color used at
+  // join matches what the player picked last session. First-time
+  // visitors get a random hue (and we persist it immediately) so two
+  // browsers don't both walk in as default-blue.
   const savedWall = loadWallColor() ?? DEFAULT_WALL_COLOR;
-  const savedPlayer = loadPlayerColor() ?? DEFAULT_PLAYER_COLOR;
+  let savedPlayer = loadPlayerColor();
+  if (!savedPlayer) {
+    savedPlayer = randomPlayerColor();
+    savePlayerColor(savedPlayer);
+  }
   wallColorInput.value = savedWall;
   playerColorInput.value = savedPlayer;
 
@@ -77,21 +84,20 @@ async function boot(): Promise<void> {
 
   const renderer = new Renderer(appEl);
 
-  // Door cells (perimeter walls that should be skipped so the Exit visual
-  // takes their place). Indexed by flat tile position for O(1) lookup
-  // inside the wall builder loop.
+  // Door cells (perimeter walls replaced with green Exit blocks). Indexed
+  // by flat tile position for O(1) lookup inside the wall builder loop.
   const doorCellIndices = new Set<number>();
   state.exits.forEach((e) => {
-    doorCellIndices.add(e.doorY * maze.width + e.doorX);
+    doorCellIndices.add(e.gy * maze.width + e.gx);
   });
 
   const builtMaze: BuiltMaze = buildMazeMesh(maze, doorCellIndices);
   renderer.scene.add(builtMaze.group);
   builtMaze.setWallColor(hexFromColor(savedWall));
 
-  // Doors fill the gaps in the perimeter wall where MazeMesh skipped.
+  // Each exit renders a green wall-sized cube in the gap MazeMesh left.
   state.exits.forEach((e) => {
-    renderer.scene.add(new Exit(e.doorX, e.doorY, maze.width, maze.height).object);
+    renderer.scene.add(new Exit(e.gx, e.gy, maze.width, maze.height).object);
   });
 
   const flag = new Flag();
@@ -141,6 +147,14 @@ async function boot(): Promise<void> {
     prelockEl.style.display = locked ? 'none' : 'flex';
   });
   playBtn.addEventListener('click', () => controls.requestLock());
+
+  // Fallback: clicking the 3D scene itself also locks. If the Play
+  // button is somehow swallowed (color picker focus, Chrome lock-out
+  // cooldown, etc.) the player can still get in by just clicking
+  // through the overlay onto the canvas behind it.
+  renderer.domElement.addEventListener('click', () => {
+    if (!controls.isLocked) controls.requestLock();
+  });
 
   // Color pickers. `input` fires on every drag tick — Three.js handles
   // wall recolor in O(1) (just material.color.set), and 'setColor'

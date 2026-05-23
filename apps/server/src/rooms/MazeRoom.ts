@@ -17,12 +17,10 @@ import {
   MAZE_WIDTH,
   MIN_PLAYERS_PER_ROOM,
   MODE_CAPTURE,
-  mulberry32,
   PHASE_COUNTDOWN,
   PHASE_ENDED,
   PHASE_LOBBY,
   PHASE_PLAYING,
-  pickFloorCells,
   stepPlayer,
   TAG_COOLDOWN_MS,
   TAG_FRONT_CONE_COS,
@@ -38,6 +36,7 @@ import {
   applyGameTick,
   exitsToReadonly,
   pickFlagCell,
+  pickPerimeterSpawns,
 } from '../game/GameRules.js';
 import { MovementValidator } from '../game/MovementValidator.js';
 import { ExitPoint } from '../schema/ExitPoint.js';
@@ -59,22 +58,15 @@ type SetColorMessage = {
   readonly color?: unknown;
 };
 
-// Two exits, hard-pinned to opposite corners. Zone = inner cell the player
-// must reach to win; door = perimeter wall cell where the visual "doorway"
-// lives (the client replaces the wall cube there).
-function chooseExitPlacements(
-  maze: MazeGrid,
-): Array<{ zoneX: number; zoneY: number; doorX: number; doorY: number }> {
+// Two exits, hard-pinned to opposite-corner perimeter walls. Each pair is
+// the door cell itself — a wall on the outer perimeter that the player
+// has to physically touch (from inside the adjacent inner cell) to win.
+function chooseExitDoors(maze: MazeGrid): Array<{ x: number; y: number }> {
   return [
-    // top-left: door breaks the north wall
-    { zoneX: 1, zoneY: 1, doorX: 1, doorY: 0 },
-    // bottom-right: door breaks the south wall
-    {
-      zoneX: maze.width - 2,
-      zoneY: maze.height - 2,
-      doorX: maze.width - 2,
-      doorY: maze.height - 1,
-    },
+    // Top-left: door punches the north wall next to the (1,1) inner cell.
+    { x: 1, y: 0 },
+    // Bottom-right: door on the south wall next to (W-2, H-2).
+    { x: maze.width - 2, y: maze.height - 1 },
   ];
 }
 
@@ -113,29 +105,26 @@ export class MazeRoom extends Room<GameState> {
     const maze = generateMaze({ width: MAZE_WIDTH, height: MAZE_HEIGHT, seed });
     this.maze = maze;
 
-    // Spawn pool. Different seed-derived RNG than the exit shuffler so
-    // spawns and exits don't correlate.
-    const spawnRng = mulberry32(seed ^ 0xdeadbeef);
-    this.spawnCells = pickFloorCells(maze, spawnRng, MAX_PLAYERS_PER_ROOM).map(
-      (c) => [c[0], c[1]] as const,
-    );
-
-    // Flag at the maze center.
+    // Flag at the maze center. Computed first so spawn placement can
+    // measure distance against it.
     const flagCell = pickFlagCell(maze);
     state.flag.x = gridToWorldX(flagCell.gx, maze.width, CELL_SIZE);
     state.flag.z = gridToWorldZ(flagCell.gy, maze.height, CELL_SIZE);
     state.flag.carriedBy = '';
 
-    // Two exits, fixed at opposite corners of the maze. Zone + door cell
-    // travel together so the client knows where to render the doorway
-    // (door cell) and the server knows where to check the win (zone cell).
-    const placements = chooseExitPlacements(maze);
-    for (const p of placements) {
+    // Spawns on the inner perimeter, ordered by grid-distance-from-flag
+    // descending — first player to join gets the farthest corner, the
+    // 8th gets whatever's left along the edges.
+    this.spawnCells = pickPerimeterSpawns(maze, flagCell, MAX_PLAYERS_PER_ROOM);
+
+    // Two exits, fixed at opposite-corner perimeter walls. The door cell
+    // IS the win cell — player has to physically push up against the
+    // wall from the adjacent inner cell.
+    const doors = chooseExitDoors(maze);
+    for (const d of doors) {
       const e = new ExitPoint();
-      e.gx = p.zoneX;
-      e.gy = p.zoneY;
-      e.doorX = p.doorX;
-      e.doorY = p.doorY;
+      e.gx = d.x;
+      e.gy = d.y;
       state.exits.push(e);
     }
 
@@ -151,7 +140,7 @@ export class MazeRoom extends Room<GameState> {
         code: options.code,
         seed,
         mode: state.mode,
-        exits: placements.length,
+        exits: doors.length,
       },
       'maze room created',
     );

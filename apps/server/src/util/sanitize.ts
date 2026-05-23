@@ -22,3 +22,15 @@ export function sanitizeName(raw: unknown, fallback = 'guest'): string {
   const cleaned = bounded.trim().replace(ALLOWED, '').slice(0, DISPLAY_LIMIT);
   return cleaned.length > 0 ? cleaned : fallback;
 }
+
+// CSS-style #RRGGBB only. Anything else (3-char short form, 8-char with
+// alpha, named colors, gradients, etc.) is rejected — keeps the on-the-
+// wire color field a fixed 7 chars and means clients never have to parse
+// anything unfamiliar.
+const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+export function sanitizeColor(raw: unknown, fallback = '#4f7cff'): string {
+  if (typeof raw !== 'string') return fallback;
+  if (!COLOR_RE.test(raw)) return fallback;
+  return raw.toLowerCase();
+}

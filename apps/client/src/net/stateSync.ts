@@ -41,5 +41,6 @@ function viewOf(p: PlayerStateNet): PlayerStateView {
     yaw: p.yaw,
     connected: p.connected,
     lastSeq: p.lastSeq,
+    color: p.color,
   };
 }

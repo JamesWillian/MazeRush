@@ -33,11 +33,21 @@ export const EXIT_REACH_RADIUS = 1.2;
 // Tag-to-drop mechanic: a player can knock the flag off the carrier by
 // left-clicking when close to and facing them. Server-authoritative —
 // client just sends a 'tag' message, server checks geometry + cooldown.
-export const TAG_REACH_RADIUS = 1.2;
-// cos(60°) — carrier must be within a 120° forward cone of the attacker.
-// 0.5 = 60° half-angle; lower (looser) makes drive-by tagging easier.
-export const TAG_FRONT_CONE_COS = 0.5;
+export const TAG_REACH_RADIUS = 2.0;
+// cos(90°) = 0 — carrier just has to be in the front hemisphere. Very
+// forgiving; only "stabs in the back" don't count. Raise toward 0.5 if
+// players start drive-by tagging at weird angles.
+export const TAG_FRONT_CONE_COS = 0.0;
 export const TAG_COOLDOWN_MS = 500;
+// How far from the carrier the flag falls when knocked off — placed
+// roughly between attacker and carrier so the carrier can't immediately
+// re-pick it up but the attacker can.
+export const FLAG_DROP_OFFSET = FLAG_PICKUP_RADIUS * 1.5;
+
+// Default player avatar color used by anyone who hasn't picked one yet.
+// `#4f7cff` mirrors the UI accent — recognizable as "default player".
+export const DEFAULT_PLAYER_COLOR = '#4f7cff';
+export const DEFAULT_WALL_COLOR = '#7b6c52';
 
 export const INTERPOLATION_DELAY_MS = 100;
 

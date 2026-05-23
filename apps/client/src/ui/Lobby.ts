@@ -1,6 +1,13 @@
 import type { Room } from 'colyseus.js';
 
-import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '@mazerush/shared';
+import {
+  DEFAULT_PLAYER_COLOR,
+  generateRoomCode,
+  isValidRoomCode,
+  normalizeRoomCode,
+} from '@mazerush/shared';
+
+import { loadPlayerColor } from './colorStore.js';
 
 import type { ColyseusClient } from '../net/ColyseusClient.js';
 
@@ -150,7 +157,8 @@ export class Lobby {
 
     btn.addEventListener('click', () => {
       const name = this.getName();
-      void this.attempt(() => this.client.createMaze(name, code), name, code);
+      const color = loadPlayerColor() ?? DEFAULT_PLAYER_COLOR;
+      void this.attempt(() => this.client.createMaze(name, code, color), name, code);
     });
   }
 
@@ -176,7 +184,8 @@ export class Lobby {
         return;
       }
       const name = this.getName();
-      void this.attempt(() => this.client.joinMazeByCode(name, code), name, code);
+      const color = loadPlayerColor() ?? DEFAULT_PLAYER_COLOR;
+      void this.attempt(() => this.client.joinMazeByCode(name, code, color), name, code);
     });
   }
 

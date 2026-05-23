@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 import {
   CELL_SIZE,
+  DEFAULT_WALL_COLOR,
   gridToWorldX,
   gridToWorldZ,
   type MazeGrid,
@@ -10,18 +11,36 @@ import {
 
 import { WALL_HEIGHT } from '../config.js';
 
+export interface BuiltMaze {
+  readonly group: THREE.Group;
+  setWallColor(hex: number): void;
+}
+
 // Builds a Three.js Group containing the floor plus a single InstancedMesh
-// for every wall tile. The maze is static for the lifetime of a match, so we
-// build once and never touch instanceMatrix again.
+// for every wall tile. The maze is static for the lifetime of a match, so
+// we build once.
 //
-// Why InstancedMesh: a 21×21 maze typically has 200+ wall tiles. Rendering
-// each as its own Mesh would issue 200+ draw calls per frame. InstancedMesh
-// collapses that to one regardless of count.
-export function buildMazeMesh(maze: MazeGrid): THREE.Group {
+// `skipCells` is a set of `y * width + x` indices for wall cells that
+// should NOT render — used by exit doors to punch holes in the perimeter
+// so the door visual (rendered separately) can take their place. Physics
+// still treats those cells as walls; the player can't actually walk
+// through, the door is a visual marker on the perimeter.
+//
+// `setWallColor` lets the pause-screen color picker recolor walls
+// instantly: assigning to `material.color` is reflected next frame, no
+// rebuild needed.
+export function buildMazeMesh(maze: MazeGrid, skipCells: ReadonlySet<number> = new Set()): BuiltMaze {
   const group = new THREE.Group();
   group.add(buildFloor(maze));
-  group.add(buildWalls(maze));
-  return group;
+  const { mesh, material } = buildWalls(maze, skipCells);
+  group.add(mesh);
+
+  return {
+    group,
+    setWallColor(hex: number): void {
+      material.color.setHex(hex);
+    },
+  };
 }
 
 function buildFloor(maze: MazeGrid): THREE.Mesh {
@@ -34,18 +53,26 @@ function buildFloor(maze: MazeGrid): THREE.Mesh {
   return mesh;
 }
 
-function buildWalls(maze: MazeGrid): THREE.InstancedMesh {
+function buildWalls(
+  maze: MazeGrid,
+  skipCells: ReadonlySet<number>,
+): { mesh: THREE.InstancedMesh; material: THREE.MeshStandardMaterial } {
   const wallCells: Array<readonly [number, number]> = [];
   for (let y = 0; y < maze.height; y++) {
     for (let x = 0; x < maze.width; x++) {
-      if (maze.tiles[y * maze.width + x] === Tile.Wall) {
+      const idx = y * maze.width + x;
+      if (skipCells.has(idx)) continue;
+      if (maze.tiles[idx] === Tile.Wall) {
         wallCells.push([x, y]);
       }
     }
   }
 
   const geom = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
-  const mat = new THREE.MeshStandardMaterial({ color: 0x7b6c52, roughness: 0.85 });
+  const mat = new THREE.MeshStandardMaterial({
+    color: parseInt(DEFAULT_WALL_COLOR.slice(1), 16),
+    roughness: 0.85,
+  });
   const instances = new THREE.InstancedMesh(geom, mat, wallCells.length);
 
   const m = new THREE.Matrix4();
@@ -59,5 +86,5 @@ function buildWalls(maze: MazeGrid): THREE.InstancedMesh {
     instances.setMatrixAt(i, m);
   }
   instances.instanceMatrix.needsUpdate = true;
-  return instances;
+  return { mesh: instances, material: mat };
 }

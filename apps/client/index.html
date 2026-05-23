@@ -170,10 +170,24 @@
       <div class="panel">
         <h1>MazeRush</h1>
         <p>
-          Move with <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>, look with the mouse,
-          sprint with <kbd>Shift</kbd>.
+          Move with <kbd>W</kbd> <kbd>A</kbd> <kbd>D</kbd> <kbd>S</kbd>, look with the mouse,
+          sprint with <kbd>Shift</kbd>, left-click to knock the flag off the carrier.
         </p>
         <p>Press <kbd>Esc</kbd> to release the cursor.</p>
+
+        <div
+          style="display:flex; gap:1.25rem; justify-content:center; margin: 1rem 0 1.25rem 0;"
+        >
+          <label style="display:flex; flex-direction:column; align-items:center; gap:.25rem;">
+            <span style="font-size:.78rem; opacity:.7;">Walls</span>
+            <input id="color-walls" type="color" value="#7b6c52" />
+          </label>
+          <label style="display:flex; flex-direction:column; align-items:center; gap:.25rem;">
+            <span style="font-size:.78rem; opacity:.7;">You</span>
+            <input id="color-player" type="color" value="#4f7cff" />
+          </label>
+        </div>
+
         <button id="play">Click to play</button>
         <p id="status" style="margin-top: 1rem; font-size: 0.85rem; opacity: 0.6;"></p>
       </div>

@@ -6,8 +6,9 @@ import {
   CELL_SIZE,
   COUNTDOWN_MS,
   END_SCREEN_MS,
-  EXIT_COUNT,
+  FLAG_DROP_OFFSET,
   generateMaze,
+  getTile,
   gridToWorldX,
   gridToWorldZ,
   isValidRoomCode,
@@ -26,14 +27,16 @@ import {
   TAG_COOLDOWN_MS,
   TAG_FRONT_CONE_COS,
   TAG_REACH_RADIUS,
+  Tile,
   TICK_INTERVAL_MS,
+  worldToGridX,
+  worldToGridZ,
   type MazeGrid,
 } from '@mazerush/shared';
 
 import {
   applyGameTick,
   exitsToReadonly,
-  pickExits,
   pickFlagCell,
 } from '../game/GameRules.js';
 import { MovementValidator } from '../game/MovementValidator.js';
@@ -41,7 +44,7 @@ import { ExitPoint } from '../schema/ExitPoint.js';
 import { GameState } from '../schema/GameState.js';
 import { PlayerState } from '../schema/PlayerState.js';
 import { logger } from '../util/logger.js';
-import { sanitizeName } from '../util/sanitize.js';
+import { sanitizeColor, sanitizeName } from '../util/sanitize.js';
 
 type RoomCreateOptions = {
   readonly code?: unknown;
@@ -49,7 +52,31 @@ type RoomCreateOptions = {
 
 type JoinOptions = {
   readonly name?: unknown;
+  readonly color?: unknown;
 };
+
+type SetColorMessage = {
+  readonly color?: unknown;
+};
+
+// Two exits, hard-pinned to opposite corners. Zone = inner cell the player
+// must reach to win; door = perimeter wall cell where the visual "doorway"
+// lives (the client replaces the wall cube there).
+function chooseExitPlacements(
+  maze: MazeGrid,
+): Array<{ zoneX: number; zoneY: number; doorX: number; doorY: number }> {
+  return [
+    // top-left: door breaks the north wall
+    { zoneX: 1, zoneY: 1, doorX: 1, doorY: 0 },
+    // bottom-right: door breaks the south wall
+    {
+      zoneX: maze.width - 2,
+      zoneY: maze.height - 2,
+      doorX: maze.width - 2,
+      doorY: maze.height - 1,
+    },
+  ];
+}
 
 export class MazeRoom extends Room<GameState> {
   override maxClients = MAX_PLAYERS_PER_ROOM;
@@ -99,12 +126,16 @@ export class MazeRoom extends Room<GameState> {
     state.flag.z = gridToWorldZ(flagCell.gy, maze.height, CELL_SIZE);
     state.flag.carriedBy = '';
 
-    // Exits on the inner perimeter, never overlapping the flag.
-    const exitCells = pickExits(maze, seed, EXIT_COUNT, [flagCell]);
-    for (const cell of exitCells) {
+    // Two exits, fixed at opposite corners of the maze. Zone + door cell
+    // travel together so the client knows where to render the doorway
+    // (door cell) and the server knows where to check the win (zone cell).
+    const placements = chooseExitPlacements(maze);
+    for (const p of placements) {
       const e = new ExitPoint();
-      e.gx = cell.gx;
-      e.gy = cell.gy;
+      e.gx = p.zoneX;
+      e.gy = p.zoneY;
+      e.doorX = p.doorX;
+      e.doorY = p.doorY;
       state.exits.push(e);
     }
 
@@ -112,6 +143,7 @@ export class MazeRoom extends Room<GameState> {
     this.setSimulationInterval(() => this.tick(), TICK_INTERVAL_MS);
     this.onMessage('input', (client, raw: unknown) => this.handleInput(client, raw));
     this.onMessage('tag', (client) => this.handleTag(client));
+    this.onMessage('setColor', (client, raw: unknown) => this.handleSetColor(client, raw));
 
     logger.info(
       {
@@ -119,7 +151,7 @@ export class MazeRoom extends Room<GameState> {
         code: options.code,
         seed,
         mode: state.mode,
-        exits: exitCells.length,
+        exits: placements.length,
       },
       'maze room created',
     );
@@ -131,6 +163,7 @@ export class MazeRoom extends Room<GameState> {
     const player = new PlayerState();
     player.id = client.sessionId;
     player.name = sanitizeName(options.name);
+    player.color = sanitizeColor(options.color);
 
     const cell = this.spawnCells.shift() ?? [1, 1];
     player.x = gridToWorldX(cell[0], this.maze.width, CELL_SIZE);
@@ -261,6 +294,8 @@ export class MazeRoom extends Room<GameState> {
   // their successful tries too.
   private handleTag(client: Client): void {
     if (this.state.phase !== PHASE_PLAYING) return;
+    const maze = this.maze;
+    if (!maze) return;
 
     const attacker = this.state.players.get(client.sessionId);
     if (!attacker) return;
@@ -294,13 +329,44 @@ export class MazeRoom extends Room<GameState> {
       if (dot < TAG_FRONT_CONE_COS) return;
     }
 
+    // Drop the flag toward the attacker so the carrier can't immediately
+    // re-grab it. Snap back to the carrier's feet if the offset would land
+    // inside a wall (rare edge case — carriers near a corner).
+    let dropX = carrier.x;
+    let dropZ = carrier.z;
+    if (dist > 1e-3) {
+      const nx = dx / dist;
+      const nz = dz / dist;
+      const candidateX = carrier.x + nx * FLAG_DROP_OFFSET;
+      const candidateZ = carrier.z + nz * FLAG_DROP_OFFSET;
+      const gx = worldToGridX(candidateX, maze.width, CELL_SIZE);
+      const gy = worldToGridZ(candidateZ, maze.height, CELL_SIZE);
+      if (getTile(maze, gx, gy) !== Tile.Wall) {
+        dropX = candidateX;
+        dropZ = candidateZ;
+      }
+    }
+
     this.state.flag.carriedBy = '';
-    this.state.flag.x = carrier.x;
-    this.state.flag.z = carrier.z;
+    this.state.flag.x = dropX;
+    this.state.flag.z = dropZ;
     logger.info(
       { roomId: this.roomId, attacker: client.sessionId, carrier: carrierId },
       'flag tagged off carrier',
     );
+  }
+
+  // Mid-game color change. Same sanitizer as onJoin — client could send
+  // anything; we mirror only valid #RRGGBB. Silent drop on invalid input,
+  // since the picker UI should be giving us well-formed values anyway.
+  private handleSetColor(client: Client, raw: unknown): void {
+    if (raw === null || typeof raw !== 'object') return;
+    const msg = raw as SetColorMessage;
+    const sanitized = sanitizeColor(msg.color, '');
+    if (sanitized === '') return;
+    const player = this.state.players.get(client.sessionId);
+    if (!player) return;
+    player.color = sanitized;
   }
 
   private handleInput(client: Client, raw: unknown): void {

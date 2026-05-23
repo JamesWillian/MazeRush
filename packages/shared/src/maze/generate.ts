@@ -1,6 +1,13 @@
 import { mulberry32, randInt, type Rng } from './seededRng.js';
 import { Tile, type MazeGrid } from './types.js';
 
+// Fraction of "loopable" interior walls to knock down AFTER the recursive
+// backtracker finishes. A perfect maze has exactly one path between any
+// two cells, which means long winding corridors; opening ~15% of walls
+// between adjacent floor cells creates loops, dead-end shortcuts, and
+// way more intersections without sacrificing connectivity.
+const LOOP_OPEN_FRACTION = 0.15;
+
 export type GenerateOptions = {
   readonly width: number;
   readonly height: number;
@@ -75,7 +82,55 @@ export function generateMaze(opts: GenerateOptions): MazeGrid {
     stack.push(nx, ny);
   }
 
+  carveLoops(tiles, width, height, rng, LOOP_OPEN_FRACTION);
+
   return { width, height, seed, tiles };
+}
+
+// Post-processes a perfect maze in-place: finds walls that sit between two
+// floor cells (so opening them creates a loop rather than a new dead-end)
+// and knocks down `fraction` of them, picked deterministically via the
+// supplied RNG. Order matters — call AFTER the backtracker finishes so we
+// don't trip the algorithm's "visited" check.
+function carveLoops(
+  tiles: Tile[],
+  width: number,
+  height: number,
+  rng: Rng,
+  fraction: number,
+): void {
+  if (fraction <= 0) return;
+
+  const candidates: number[] = [];
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const idx = y * width + x;
+      if (tiles[idx] !== Tile.Wall) continue;
+      const left = tiles[y * width + (x - 1)];
+      const right = tiles[y * width + (x + 1)];
+      const up = tiles[(y - 1) * width + x];
+      const down = tiles[(y + 1) * width + x];
+      const horizontalGap = left === Tile.Floor && right === Tile.Floor;
+      const verticalGap = up === Tile.Floor && down === Tile.Floor;
+      if (horizontalGap || verticalGap) candidates.push(idx);
+    }
+  }
+
+  const target = Math.floor(candidates.length * fraction);
+  // Partial Fisher–Yates: only swap into the first `target` slots.
+  for (let i = 0; i < target && i < candidates.length - 1; i++) {
+    const j = i + randInt(rng, candidates.length - i);
+    const a = candidates[i];
+    const b = candidates[j];
+    if (a !== undefined && b !== undefined) {
+      candidates[i] = b;
+      candidates[j] = a;
+    }
+  }
+  for (let i = 0; i < target; i++) {
+    const idx = candidates[i];
+    if (idx !== undefined) tiles[idx] = Tile.Floor;
+  }
 }
 
 // Convenience for tests and gameplay code that wants to know which cells are

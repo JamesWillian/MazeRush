@@ -19,7 +19,10 @@ export interface HudUpdate {
   readonly mySessionId: string;
   readonly selfPos: Vec2;
   readonly selfYaw: number;
-  readonly remotes: Map<string, { x: number; z: number; name: string }>;
+  readonly remotes: Map<
+    string,
+    { x: number; z: number; yaw: number; name: string; color: string }
+  >;
   readonly roomCode: string;
 }
 
@@ -129,8 +132,9 @@ export class HUD {
       const hasFlag = u.state.flag.carriedBy === sid;
       const tag = hasFlag ? ' 🚩' : '';
       const youMark = isMe ? ' (you)' : '';
+      const dotColor = p.color || colorForName(p.name);
       rows.push(
-        `<li><span class="dot" style="background:${colorForName(p.name)}"></span>${escapeHtml(p.name)}${youMark}${tag}</li>`,
+        `<li><span class="dot" style="background:${dotColor}"></span>${escapeHtml(p.name)}${youMark}${tag}</li>`,
       );
     });
     this.playersEl.innerHTML = `<ul>${rows.join('')}</ul>`;
@@ -168,24 +172,20 @@ export class HUD {
       ctx.fill();
     }
 
-    // Remote players
-    u.remotes.forEach(({ x, z, name }) => {
-      const p = this.worldToPx(x, z);
-      ctx.fillStyle = colorForName(name);
-      ctx.beginPath();
-      ctx.arc(p.px, p.py, cellPx * 0.5, 0, Math.PI * 2);
-      ctx.fill();
+    // Remote players — arrows pointing the way they're facing, same
+    // shape as self so everyone reads the minimap the same way.
+    u.remotes.forEach(({ x, z, yaw, name, color }) => {
+      this.drawPlayerArrow(x, z, yaw, color || colorForName(name));
     });
 
-    // Self — a small arrow pointing the way we're looking
+    // Self — drawn last so it sits on top of any remote standing on us.
     const me = state.players.get(u.mySessionId);
     if (me) {
-      const meName = me.name;
-      this.drawSelfArrow(u.selfPos.x, u.selfPos.z, u.selfYaw, colorForName(meName));
+      this.drawPlayerArrow(u.selfPos.x, u.selfPos.z, u.selfYaw, me.color || colorForName(me.name));
     }
   }
 
-  private drawSelfArrow(x: number, z: number, yaw: number, color: string): void {
+  private drawPlayerArrow(x: number, z: number, yaw: number, color: string): void {
     const { px, py } = this.worldToPx(x, z);
     const size = this.cellPx * 0.85;
     // Forward direction in screen px: yaw=0 looks -Z (up on minimap with +Z = down).

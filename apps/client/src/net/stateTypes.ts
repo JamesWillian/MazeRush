@@ -16,6 +16,7 @@ export interface PlayerStateView {
   yaw: number;
   connected: boolean;
   lastSeq: number;
+  color: string;
 }
 
 // Alias for the raw schema instance (same fields, just naming clarity).
@@ -30,6 +31,8 @@ export interface FlagStateView {
 export interface ExitPointView {
   gx: number;
   gy: number;
+  doorX: number;
+  doorY: number;
 }
 
 export interface ArraySchemaLike<T> {

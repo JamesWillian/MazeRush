@@ -15,4 +15,7 @@ export class PlayerState extends Schema {
   // Last input sequence number the server has processed for this player.
   // The client uses this for prediction reconciliation in Step 6.
   @type('uint32') lastSeq = 0;
+  // Avatar color the player chose, as #RRGGBB. Default supplied; server
+  // sanitizes any client-provided value before storing.
+  @type('string') color = '#4f7cff';
 }

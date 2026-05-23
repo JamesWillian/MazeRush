@@ -18,17 +18,18 @@ export interface LobbyResult {
 // when the player has successfully connected) and `destroy()`.
 export class Lobby {
   private resolveResult: ((res: LobbyResult) => void) | null = null;
-  private rejectResult: ((err: unknown) => void) | null = null;
 
   constructor(
     private readonly root: HTMLElement,
     private readonly client: ColyseusClient,
   ) {}
 
+  // Resolves on a successful create/join. The promise has no rejection
+  // path — fatal lobby errors are surfaced in the in-form error line so
+  // the user can retry without reloading.
   async run(): Promise<LobbyResult> {
-    return new Promise<LobbyResult>((resolve, reject) => {
+    return new Promise<LobbyResult>((resolve) => {
       this.resolveResult = resolve;
-      this.rejectResult = reject;
       this.render();
     });
   }
@@ -191,7 +192,6 @@ export class Lobby {
       this.setBusy(false);
       const resolve = this.resolveResult;
       this.resolveResult = null;
-      this.rejectResult = null;
       resolve?.({ room, name, code });
     } catch (err) {
       this.setBusy(false);
